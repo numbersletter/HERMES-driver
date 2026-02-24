@@ -44,7 +44,7 @@ DiffDriveController::DiffDriveController(const rclcpp::NodeOptions & options)
   pins.stby        = this->get_parameter("gpio_stby").as_int();
 
   // ── Initialise Hardware ─────────────────────────────────────────
-  driver_ = std::make_unique<TB6612FNG>(pins, pwm_freq);
+  driver_ = std::make_unique<TB6612FNG>(pins, pwm_freq, this->get_logger());
   if (!driver_->init()) {
     RCLCPP_FATAL(this->get_logger(), "Failed to initialise TB6612FNG driver");
     throw std::runtime_error("GPIO init failed");

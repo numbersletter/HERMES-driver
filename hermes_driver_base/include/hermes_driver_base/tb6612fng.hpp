@@ -1,7 +1,13 @@
 #ifndef HERMES_DRIVER_BASE__TB6612FNG_HPP_
 #define HERMES_DRIVER_BASE__TB6612FNG_HPP_
 
+#include <atomic>
 #include <cstdint>
+#include <thread>
+
+#include <gpiod.h>
+
+#include "rclcpp/rclcpp.hpp"
 
 namespace hermes_driver
 {
@@ -22,10 +28,19 @@ struct TB6612Pins
   int stby;           // Standby pin (HIGH = enabled)
 };
 
+/// Software PWM state for a single output line.
+struct PwmState
+{
+  gpiod_line * line{nullptr};
+  std::atomic<int> duty{0};      // duty cycle 0–100
+  std::thread thread;
+  std::atomic<bool> running{false};
+};
+
 /// Low-level driver for the TB6612FNG dual H-bridge motor driver.
 ///
 /// Responsibilities:
-///   - Initialise GPIO pins (via lgpio)
+///   - Initialise GPIO pins (via libgpiod)
 ///   - Accept a speed value [-1.0, 1.0] per motor and translate to
 ///     PWM duty-cycle + direction pin states
 ///   - Enable / disable the driver via the STBY pin
@@ -34,10 +49,14 @@ class TB6612FNG
 public:
   /// @param pins        GPIO pin mapping
   /// @param pwm_freq    PWM frequency in Hz (typical: 1000–20000)
-  explicit TB6612FNG(const TB6612Pins & pins, int pwm_freq = 1000);
+  /// @param logger      ROS 2 logger used to report GPIO errors
+  explicit TB6612FNG(
+    const TB6612Pins & pins,
+    int pwm_freq = 1000,
+    rclcpp::Logger logger = rclcpp::get_logger("TB6612FNG"));
   ~TB6612FNG();
 
-  // Prevent copies (owns a GPIO chip handle)
+  // Prevent copies (owns GPIO chip and line handles)
   TB6612FNG(const TB6612FNG &) = delete;
   TB6612FNG & operator=(const TB6612FNG &) = delete;
 
@@ -60,11 +79,29 @@ public:
   void shutdown();
 
 private:
-  void set_motor(const MotorPins & pins, double speed);
+  void set_motor(
+    const MotorPins & mp, double speed,
+    PwmState & pwm_state, gpiod_line * in1, gpiod_line * in2);
+  void start_pwm(PwmState & pwm_state);
+  void stop_pwm(PwmState & pwm_state);
 
   TB6612Pins pins_;
   int pwm_freq_;
-  int gpio_handle_{-1};   // lgpio chip handle
+  rclcpp::Logger logger_;
+
+  gpiod_chip * chip_{nullptr};
+
+  // Direction / standby lines
+  gpiod_line * in1_a_{nullptr};
+  gpiod_line * in2_a_{nullptr};
+  gpiod_line * in1_b_{nullptr};
+  gpiod_line * in2_b_{nullptr};
+  gpiod_line * stby_{nullptr};
+
+  // Software PWM channels
+  PwmState pwm_a_;
+  PwmState pwm_b_;
+
   bool initialised_{false};
 };
 

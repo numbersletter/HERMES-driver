@@ -12,9 +12,9 @@ find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
 # ── GPIO Library ─────────────────────────────────────────────────────
-# lgpio is a C library; find it as a system library.
-# On Raspberry Pi: sudo apt install liblgpio-dev
-find_library(LGPIO_LIB lgpio REQUIRED)
+# libgpiod is a C library; find it as a system library.
+# On Raspberry Pi: sudo apt install libgpiod-dev
+find_library(GPIOD_LIB gpiod REQUIRED)
 
 # ── Build ────────────────────────────────────────────────────────────
 add_executable(diff_drive_controller_node
@@ -33,7 +33,7 @@ ament_target_dependencies(diff_drive_controller_node
   std_msgs
 )
 
-target_link_libraries(diff_drive_controller_node ${LGPIO_LIB})
+target_link_libraries(diff_drive_controller_node ${GPIOD_LIB})
 
 # ── Install ──────────────────────────────────────────────────────────
 install(TARGETS diff_drive_controller_node
