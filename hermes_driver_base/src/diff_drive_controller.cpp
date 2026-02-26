@@ -1,6 +1,7 @@
 #include "hermes_driver_base/diff_drive_controller.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 namespace hermes_driver
@@ -14,6 +15,7 @@ DiffDriveController::DiffDriveController(const rclcpp::NodeOptions & options)
   this->declare_parameter("wheel_radius",     0.035);  // metres
   this->declare_parameter("max_rpm",          200.0);
   this->declare_parameter("pwm_frequency",    1000);
+  this->declare_parameter("cmd_vel_timeout",  0.5);    // seconds
 
   // Default GPIO pin numbers (BCM numbering)
   this->declare_parameter("gpio_pwma", 12);
@@ -33,6 +35,7 @@ DiffDriveController::DiffDriveController(const rclcpp::NodeOptions & options)
   max_motor_speed_  = max_rpm * 2.0 * M_PI / 60.0;  // convert RPM → rad/s
 
   int pwm_freq = this->get_parameter("pwm_frequency").as_int();
+  double cmd_vel_timeout = this->get_parameter("cmd_vel_timeout").as_double();
 
   // Or we can set pins based on input arguments (if they are given)
   TB6612Pins pins;
@@ -59,9 +62,19 @@ DiffDriveController::DiffDriveController(const rclcpp::NodeOptions & options)
     "cmd_vel", 10,
     std::bind(&DiffDriveController::cmd_vel_callback, this, std::placeholders::_1));
 
+  // ── cmd_vel watchdog timer ──────────────────────────────────────
+  // Stops the motors if no cmd_vel message is received within the timeout period.
+  if (cmd_vel_timeout > 0.0) {
+    auto timeout_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::duration<double>(cmd_vel_timeout));
+    cmd_vel_watchdog_ = this->create_wall_timer(
+      timeout_ns,
+      std::bind(&DiffDriveController::cmd_vel_timeout_callback, this));
+  }
+
   RCLCPP_INFO(this->get_logger(),
-    "DiffDriveController ready  [sep=%.3f m, radius=%.4f m, max_rpm=%.0f]",
-    wheel_separation_, wheel_radius_, max_rpm);
+    "DiffDriveController ready  [sep=%.3f m, radius=%.4f m, max_rpm=%.0f, timeout=%.2fs]",
+    wheel_separation_, wheel_radius_, max_rpm, cmd_vel_timeout);
 }
 
 DiffDriveController::~DiffDriveController()
@@ -74,8 +87,19 @@ DiffDriveController::~DiffDriveController()
 void DiffDriveController::cmd_vel_callback(
   const geometry_msgs::msg::Twist::SharedPtr msg)
 {
+  // Reset the watchdog timer so the timeout starts fresh from now.
+  if (cmd_vel_watchdog_) {
+    cmd_vel_watchdog_->reset();
+  }
   auto [left, right] = twist_to_wheel_speeds(msg->linear.x, msg->angular.z);
   driver_->set_motors(left, right);
+}
+
+void DiffDriveController::cmd_vel_timeout_callback()
+{
+  RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+    "cmd_vel timeout: stopping motors");
+  driver_->set_motors(0.0, 0.0);
 }
 
 std::pair<double, double> DiffDriveController::twist_to_wheel_speeds(
