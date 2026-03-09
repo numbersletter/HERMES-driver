@@ -21,6 +21,7 @@ namespace hermes_driver
 ///   - wheel_radius       [m]   radius of the drive wheels
 ///   - max_rpm            [double]  maximum motor RPM at duty-cycle 1.0
 ///   - pwm_frequency      [Hz]
+///   - cmd_vel_timeout    [s]   stop motors if no cmd_vel received within this period (0 = disabled)
 ///   - gpio_pwma, gpio_ain1, gpio_ain2   Motor A GPIO BCM pin numbers
 ///   - gpio_pwmb, gpio_bin1, gpio_bin2   Motor B GPIO BCM pin numbers
 ///   - gpio_stby                         Standby GPIO BCM pin number
@@ -36,6 +37,9 @@ private:
   /// Convert linear + angular velocity to per-wheel speed [-1.0, 1.0].
   std::pair<double, double> twist_to_wheel_speeds(double linear, double angular) const;
 
+  /// Called when no cmd_vel has been received within the timeout period.
+  void cmd_vel_timeout_callback();
+
   // Parameters
   double wheel_separation_{0.0};
   double wheel_radius_{0.0};
@@ -46,6 +50,7 @@ private:
 
   // ROS
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
+  rclcpp::TimerBase::SharedPtr cmd_vel_watchdog_;
 };
 
 }  // namespace hermes_driver

@@ -10,6 +10,9 @@ diff_drive_controller:
     # ── Motor limits ──────────────────────────────────────────────
     max_rpm: 200.0            # free-spin RPM of your DC motors
 
+    # ── cmd_vel watchdog ──────────────────────────────────────────
+    cmd_vel_timeout: 0.5      # seconds – stop motors if no cmd_vel received (0 = disabled)
+
     # ── PWM ───────────────────────────────────────────────────────
     pwm_frequency: 1000       # Hz  (frequency at which the PWM signal is generated)
 
