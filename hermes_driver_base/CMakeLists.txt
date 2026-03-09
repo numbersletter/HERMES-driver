@@ -16,7 +16,7 @@ find_package(std_msgs REQUIRED)
 # On Raspberry Pi OS (Bookworm): sudo apt install libgpiod-dev
 # Enforces the v2 API which is incompatible with v1.x.
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GPIOD REQUIRED gpiod>=2.0)
+pkg_check_modules(GPIOD REQUIRED libgpiod>=2.0)
 
 # Threads are required for software PWM
 find_package(Threads REQUIRED)
